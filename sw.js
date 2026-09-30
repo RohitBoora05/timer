@@ -1,5 +1,5 @@
 // Offline support: network first (always the latest version when online), cached copy when offline.
-const CACHE = 'timer-v2';
+const CACHE = 'timer-v3';
 const FILES = ['./', 'index.html', 'manifest.webmanifest', 'icon-180.png', 'icon-192.png', 'icon-512.png'];
 
 self.addEventListener('install', e => {

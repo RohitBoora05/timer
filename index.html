@@ -125,8 +125,7 @@ body:not([data-phase="setup"]) .picker{opacity:0;visibility:hidden;pointer-event
   #btnMain{order:2}
 }
 
-/* hidden speed panel — opened by triple-tapping the invisible top-right corner */
-.corner{position:fixed;top:0;right:0;width:88px;height:88px;z-index:5}
+/* hidden speed panel — opened by double-tapping the Stopwatch button */
 .back{position:fixed;inset:0;z-index:10;display:grid;place-items:center;background:rgba(0,0,0,.55);opacity:0;visibility:hidden;transition:opacity .2s,visibility .2s}
 .back.open{opacity:1;visibility:visible}
 .sheet{width:min(440px,calc(100vw - 32px));max-height:calc(100vh - 32px);overflow:auto;background:#1c1c1e;border-radius:20px;padding:20px;display:grid;grid-template-columns:minmax(0,1fr);gap:20px;transform:translateY(12px) scale(.98);transition:transform .2s}
@@ -158,7 +157,7 @@ input[type=range]{width:100%;accent-color:var(--accent);margin:4px 0 12px}
 <main class="app">
   <nav class="nav" aria-label="Sections">
     <button aria-current="page"><svg viewBox="0 0 24 24"><path d="M7 3h10M7 21h10M8 3v2.5c0 2.5 4 4 4 6.5s-4 4-4 6.5V21M16 3v2.5c0 2.5-4 4-4 6.5s4 4 4 6.5V21"/></svg>Timer</button>
-    <button><svg viewBox="0 0 24 24"><circle cx="12" cy="13.5" r="7.5"/><path d="M10 2.5h4M12 2.5V6M12 13.5l3-3M18.5 6.5l1.5-1.5"/></svg>Stopwatch</button>
+    <button id="navStopwatch"><svg viewBox="0 0 24 24"><circle cx="12" cy="13.5" r="7.5"/><path d="M10 2.5h4M12 2.5V6M12 13.5l3-3M18.5 6.5l1.5-1.5"/></svg>Stopwatch</button>
     <button><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3.5 2"/></svg>Clock</button>
   </nav>
   <div class="stage">
@@ -182,7 +181,6 @@ input[type=range]{width:100%;accent-color:var(--accent);margin:4px 0 12px}
   </div>
 </main>
 <button class="fs" id="fs" aria-label="Full screen" hidden><svg viewBox="0 0 24 24"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg></button>
-<div class="corner" id="corner" aria-hidden="true"></div>
 <div class="back" id="back" role="dialog" aria-modal="true" aria-label="Speed">
   <div class="sheet">
     <header><h2>Speed</h2><button class="link" id="done">Done</button></header>
@@ -413,12 +411,16 @@ input[type=range]{width:100%;accent-color:var(--accent);margin:4px 0 12px}
   }
   function closePanel() { document.activeElement && document.activeElement.blur(); back.classList.remove('open'); saveSettings(); }
   $('done').addEventListener('click', closePanel);
-  back.addEventListener('click', e => { if (e.target === back) closePanel(); });
+  // close on a tap outside the sheet — only if the press also started there
+  // (the lifting finger of the second tap can land on the new backdrop and would otherwise close it)
+  let downOnBack = false;
+  back.addEventListener('pointerdown', e => { downOnBack = e.target === back; });
+  back.addEventListener('click', e => { if (e.target === back && downOnBack) closePanel(); downOnBack = false; });
 
-  let taps = [];
-  $('corner').addEventListener('pointerdown', e => {
-    taps = taps.filter(t => e.timeStamp - t < 700); taps.push(e.timeStamp);
-    if (taps.length >= 3) { taps = []; openPanel(); }
+  // Hidden trigger: double-tap the Stopwatch button (two taps within 400 ms). A single tap does nothing.
+  let lastTap = -1e9;
+  $('navStopwatch').addEventListener('pointerdown', e => {
+    if (e.timeStamp - lastTap < 400) { lastTap = -1e9; openPanel(); } else lastTap = e.timeStamp;
   });
   document.querySelector('.nav').addEventListener('click', e => e.target.closest('button') && e.target.closest('button').blur());
 

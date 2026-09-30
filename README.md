@@ -21,7 +21,7 @@ Opened from the Home Screen, it runs without the browser toolbar. On Android it 
 
 1. Scroll the wheels to set hours, minutes and seconds, then tap **Start**.
 2. **Pause**, **Resume** and **Cancel** work like any timer.
-3. **Hidden speed controls:** triple-tap the top-right corner of the screen.
+3. **Hidden speed controls:** double-tap the **Stopwatch** button at the bottom. (A single tap does nothing.)
    - **Speed:** type a number, drag the slider, or tap a preset (1× to 100,000×).
    - **Auto speed:** for example "Pass 8 h 0 m in 4 s", then **Set**. It works out the speed for you.
    - **Speed ramp:** starts at 1× and eases up to your speed (2 s by default), so it looks natural on camera.

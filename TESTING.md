@@ -17,7 +17,8 @@ Thanks for trying Speed Timer. This takes about 5 minutes.
 
 ## 3. Hidden speed panel
 
-- [ ] Triple-tap the top-right corner. The Speed panel opens.
+- [ ] Tap **Stopwatch** once. Nothing happens.
+- [ ] Double-tap **Stopwatch**. The Speed panel opens.
 - [ ] Enter **Pass 8 h 0 m in 4 s**, tap **Set**, then **Done**.
 - [ ] Set the wheels to 8 hours and tap **Start**. It should reach 00:00:00.00 in about 4 seconds.
 - [ ] Nothing from the panel is left on screen after **Done**.

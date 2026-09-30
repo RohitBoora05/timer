@@ -4,7 +4,9 @@ A countdown timer that looks and works like a normal timer app, with a hidden co
 
 **Try it:** https://rohitboora05.github.io/timer/ (or scan the QR code with your phone camera)
 
-<img src="qr.png" alt="QR code for the Speed Timer link" width="180">
+<img src="qr.png" alt="QR code for the Speed Timer link" width="260">
+
+`https://rohitboora05.github.io/timer/`
 
 Nothing to install and no account needed. It runs in the browser on iPhone, iPad, Android and computers, and keeps working offline after the first visit.
 

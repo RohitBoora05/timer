@@ -1,5 +1,6 @@
 // Offline support: network first (always the latest version when online), cached copy when offline.
-const CACHE = 'timer-v3';
+// Keep CACHE in step with APP_VERSION in index.html.
+const CACHE = 'timer-v4';
 const FILES = ['./', 'index.html', 'manifest.webmanifest', 'icon-180.png', 'icon-192.png', 'icon-512.png'];
 
 self.addEventListener('install', e => {
@@ -13,7 +14,9 @@ self.addEventListener('activate', e => {
 self.addEventListener('fetch', e => {
   if (e.request.method !== 'GET') return;
   e.respondWith(
-    fetch(e.request)
+    // 'no-cache' = always ask the server if the file changed (cheap 304 if not), so a stale
+    // browser-cached copy is never shown after an update.
+    fetch(e.request, { cache: 'no-cache' })
       .then(r => { const copy = r.clone(); caches.open(CACHE).then(c => c.put(e.request, copy)); return r; })
       .catch(() => caches.match(e.request, { ignoreSearch: true }))
   );

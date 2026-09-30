@@ -1,0 +1,474 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#000000">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Timer">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icon-180.png">
+<title>Timer</title>
+<style>
+:root{
+  --bg:#000;--fg:#fff;--muted:#8e8e93;
+  --track:#2c2c2e;--accent:#ff9f0a;
+  --go:#30d158;--go-bg:rgba(48,209,88,.2);
+  --pause:#ff9f0a;--pause-bg:rgba(255,159,10,.2);
+  --neutral:#fff;--neutral-bg:rgba(118,118,128,.3);
+  --band:rgba(118,118,128,.24);
+  --stage:min(62vmin,620px);
+  --nav-h:44px;
+  --row:clamp(40px,6.2vmin,58px);
+  --btn:clamp(76px,11vmin,100px);
+  color-scheme:dark;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%;background:var(--bg);color:var(--fg)}
+body{
+  font-family:-apple-system,BlinkMacSystemFont,"SF Pro Display","Helvetica Neue",Inter,system-ui,sans-serif;
+  -webkit-font-smoothing:antialiased;
+  -webkit-user-select:none;user-select:none;-webkit-touch-callout:none;
+  -webkit-tap-highlight-color:transparent;touch-action:manipulation;
+  overflow:hidden;overscroll-behavior:none;
+}
+.app{
+  height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;
+  gap:clamp(24px,5vmin,56px);
+  padding:max(16px,env(safe-area-inset-top)) max(16px,env(safe-area-inset-right)) calc(max(16px,env(safe-area-inset-bottom)) + var(--nav-h) + 16px) max(16px,env(safe-area-inset-left));
+}
+
+/* decorative nav (display only) */
+.nav{
+  position:absolute;bottom:max(16px,env(safe-area-inset-bottom));left:50%;transform:translateX(-50%);
+  height:var(--nav-h);display:flex;gap:4px;padding:4px;border-radius:999px;background:var(--band);
+}
+.nav button{
+  display:flex;align-items:center;gap:7px;padding:0 16px;border:0;border-radius:999px;cursor:pointer;
+  background:transparent;color:var(--muted);font:inherit;font-size:15px;font-weight:500;
+  transition:background .15s,color .15s,transform .1s;
+}
+.nav button svg{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.nav button[aria-current="page"]{background:rgba(255,255,255,.14);color:var(--fg)}
+.nav button[aria-current="page"] svg{stroke:var(--accent)}
+.nav button:active{transform:scale(.96);background:rgba(255,255,255,.08)}
+.stage{position:relative;width:var(--stage);height:var(--stage)}
+
+/* ring + time */
+.ringwrap,.picker{transition:opacity .25s ease,visibility .25s}
+.ringwrap{position:absolute;inset:0;display:grid;place-items:center}
+.ring{position:absolute;inset:0;width:100%;height:100%;transform:rotate(-90deg)}
+.ring circle{fill:none;stroke-width:4}
+.ring .track{stroke:var(--track)}
+.ring .prog{stroke:var(--accent);stroke-linecap:round}
+.time{
+  position:relative;font-size:calc(var(--stage)*.135);font-weight:200;line-height:1;
+  font-variant-numeric:tabular-nums;letter-spacing:-.01em;white-space:nowrap;
+}
+
+/* wheel picker */
+.picker{position:absolute;left:50%;top:50%;width:max(100%,min(360px,100vw - 32px));height:calc(var(--row)*5);transform:translate(-50%,-50%);display:grid;grid-template-columns:repeat(3,1fr);grid-template-rows:100%}
+.band{position:absolute;left:0;right:0;top:50%;height:var(--row);transform:translateY(-50%);background:var(--band);border-radius:10px;pointer-events:none}
+.col{position:relative;display:flex;align-items:center;height:100%;min-height:0;overflow:hidden}
+.wheel{
+  height:100%;width:52%;overflow-y:scroll;scroll-snap-type:y mandatory;overscroll-behavior:contain;
+  scrollbar-width:none;padding:calc(var(--row)*2) 0;
+  -webkit-mask-image:linear-gradient(transparent,rgba(0,0,0,.35) 20%,#000 40%,#000 60%,rgba(0,0,0,.35) 80%,transparent);
+          mask-image:linear-gradient(transparent,rgba(0,0,0,.35) 20%,#000 40%,#000 60%,rgba(0,0,0,.35) 80%,transparent);
+}
+.wheel::-webkit-scrollbar{display:none}
+.wheel div{
+  height:var(--row);line-height:var(--row);text-align:right;scroll-snap-align:center;
+  font-size:calc(var(--row)*.52);color:var(--muted);font-variant-numeric:tabular-nums;transition:color .15s;
+}
+.wheel div.sel{color:var(--fg)}
+.unit{width:48%;padding-left:.55em;font-size:calc(var(--row)*.36);font-weight:600}
+
+body[data-phase="setup"] .ringwrap,
+body:not([data-phase="setup"]) .picker{opacity:0;visibility:hidden;pointer-events:none}
+
+/* buttons */
+.controls{width:var(--stage);display:flex;justify-content:space-between}
+.btn{
+  width:var(--btn);height:var(--btn);border-radius:50%;border:0;cursor:pointer;
+  font:inherit;font-size:calc(var(--btn)*.18);font-weight:500;
+  background:var(--b);color:var(--c);
+  box-shadow:0 0 0 3px var(--bg),0 0 0 5px var(--b);
+  transition:opacity .15s,filter .15s;
+}
+.btn:active{filter:brightness(1.35)}
+.btn:disabled{opacity:.4;cursor:default}
+.btn:focus-visible{outline:2px solid var(--c);outline-offset:8px}
+.btn.go{--b:var(--go-bg);--c:var(--go)}
+.btn.pause{--b:var(--pause-bg);--c:var(--pause)}
+.btn.neutral{--b:var(--neutral-bg);--c:var(--neutral)}
+
+/* fullscreen button — hidden when already fullscreen, launched from the Home Screen, or unsupported */
+.fs{position:fixed;top:max(12px,env(safe-area-inset-top));left:max(12px,env(safe-area-inset-left));z-index:4;width:40px;height:40px;border:0;border-radius:50%;background:var(--band);color:var(--muted);display:grid;place-items:center;cursor:pointer}
+.fs svg{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.fs[hidden]{display:none}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+
+/* phones, portrait: larger ring */
+@media (orientation:portrait) and (max-width:600px){
+  :root{--stage:min(84vw,56vh)}
+}
+/* phones, landscape: Cancel | ring | Start in one row */
+@media (orientation:landscape) and (max-height:520px){
+  :root{--stage:min(74vh,calc(100vh - var(--nav-h) - 72px));--btn:clamp(64px,17vh,84px)}
+  .app{flex-direction:row;gap:clamp(40px,8vw,88px)}
+  .controls{display:contents}
+  #btnCancel{order:0}
+  .stage{order:1;flex:none}
+  #btnMain{order:2}
+}
+
+/* hidden speed panel — opened by triple-tapping the invisible top-right corner */
+.corner{position:fixed;top:0;right:0;width:88px;height:88px;z-index:5}
+.back{position:fixed;inset:0;z-index:10;display:grid;place-items:center;background:rgba(0,0,0,.55);opacity:0;visibility:hidden;transition:opacity .2s,visibility .2s}
+.back.open{opacity:1;visibility:visible}
+.sheet{width:min(440px,calc(100vw - 32px));max-height:calc(100vh - 32px);overflow:auto;background:#1c1c1e;border-radius:20px;padding:20px;display:grid;grid-template-columns:minmax(0,1fr);gap:20px;transform:translateY(12px) scale(.98);transition:transform .2s}
+.back.open .sheet{transform:none}
+.sheet header{display:flex;justify-content:space-between;align-items:center}
+.sheet h2{font-size:17px;font-weight:600}
+.lbl{font-size:12px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:10px}
+.link{background:none;border:0;color:var(--accent);font:inherit;font-size:17px;font-weight:600;cursor:pointer}
+.speedrow{display:flex;align-items:baseline;gap:4px;margin-bottom:10px}
+.speedrow input{flex:1;width:0;min-width:0;text-align:right;background:transparent;border:0;outline:0;color:var(--fg);font:inherit;font-size:44px;font-weight:300;font-variant-numeric:tabular-nums}
+.speedrow span{font-size:28px;color:var(--muted)}
+input[type=range]{width:100%;accent-color:var(--accent);margin:4px 0 12px}
+.chips{display:flex;flex-wrap:wrap;gap:8px}
+.chip{border:0;border-radius:999px;padding:7px 12px;background:var(--band);color:var(--fg);font:inherit;font-size:14px;font-variant-numeric:tabular-nums;cursor:pointer}
+.chip.on{background:var(--accent);color:#000}
+.row{display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:17px}
+.field{width:62px;background:var(--band);border:0;border-radius:10px;color:var(--fg);font:inherit;font-size:17px;padding:8px 6px;text-align:center;outline:0}
+.field:focus{box-shadow:0 0 0 2px var(--accent)}
+.apply{margin-left:auto;border:0;border-radius:10px;padding:9px 16px;background:var(--accent);color:#000;font:inherit;font-size:16px;font-weight:600;cursor:pointer}
+.note{margin-top:8px;font-size:13px;color:var(--muted);min-height:1.3em}
+.switch{appearance:none;-webkit-appearance:none;width:51px;height:31px;border-radius:999px;background:var(--band);position:relative;cursor:pointer;transition:background .2s;flex:none}
+.switch::after{content:"";position:absolute;top:2px;left:2px;width:27px;height:27px;border-radius:50%;background:#fff;transition:transform .2s}
+.switch:checked{background:var(--go)}
+.switch:checked::after{transform:translateX(20px)}
+.spacer{flex:1}
+</style>
+</head>
+<body data-phase="setup">
+<main class="app">
+  <nav class="nav" aria-label="Sections">
+    <button aria-current="page"><svg viewBox="0 0 24 24"><path d="M7 3h10M7 21h10M8 3v2.5c0 2.5 4 4 4 6.5s-4 4-4 6.5V21M16 3v2.5c0 2.5-4 4-4 6.5s4 4 4 6.5V21"/></svg>Timer</button>
+    <button><svg viewBox="0 0 24 24"><circle cx="12" cy="13.5" r="7.5"/><path d="M10 2.5h4M12 2.5V6M12 13.5l3-3M18.5 6.5l1.5-1.5"/></svg>Stopwatch</button>
+    <button><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3.5 2"/></svg>Clock</button>
+  </nav>
+  <div class="stage">
+    <div class="ringwrap" aria-live="off">
+      <svg class="ring" viewBox="0 0 200 200" aria-hidden="true">
+        <circle class="track" cx="100" cy="100" r="97"/>
+        <circle class="prog" id="prog" cx="100" cy="100" r="97"/>
+      </svg>
+      <div class="time" id="time">00:00:00.00</div>
+    </div>
+    <div class="picker" id="picker">
+      <div class="band"></div>
+      <div class="col"><div class="wheel" id="wh" aria-label="Hours"></div><span class="unit">hours</span></div>
+      <div class="col"><div class="wheel" id="wm" aria-label="Minutes"></div><span class="unit">min</span></div>
+      <div class="col"><div class="wheel" id="ws" aria-label="Seconds"></div><span class="unit">sec</span></div>
+    </div>
+  </div>
+  <div class="controls">
+    <button class="btn neutral" id="btnCancel" disabled>Cancel</button>
+    <button class="btn go" id="btnMain">Start</button>
+  </div>
+</main>
+<button class="fs" id="fs" aria-label="Full screen" hidden><svg viewBox="0 0 24 24"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg></button>
+<div class="corner" id="corner" aria-hidden="true"></div>
+<div class="back" id="back" role="dialog" aria-modal="true" aria-label="Speed">
+  <div class="sheet">
+    <header><h2>Speed</h2><button class="link" id="done">Done</button></header>
+    <section>
+      <div class="speedrow"><input id="speedIn" type="text" inputmode="decimal" autocomplete="off"><span>×</span></div>
+      <input id="speedSlider" type="range" min="0" max="1000" step="1" aria-label="Speed">
+      <div class="chips" id="chips"></div>
+    </section>
+    <section>
+      <div class="lbl">Auto speed</div>
+      <div class="row">Pass <input class="field" id="autoH" inputmode="numeric"> h <input class="field" id="autoM" inputmode="numeric"> m in <input class="field" id="autoS" inputmode="decimal"> s <button class="apply" id="autoGo">Set</button></div>
+      <div class="note" id="autoNote"></div>
+    </section>
+    <section>
+      <div class="lbl">Speed ramp</div>
+      <div class="row">Ease in from 1× over <input class="field" id="rampS" inputmode="decimal"> s <span class="spacer"></span><input type="checkbox" class="switch" id="rampOn" aria-label="Speed ramp"></div>
+    </section>
+  </div>
+</div>
+<script>
+(() => {
+  const $ = id => document.getElementById(id);
+  const timeEl = $('time'), prog = $('prog'), btnMain = $('btnMain'), btnCancel = $('btnCancel');
+
+  /* ---------- engine ---------- */
+  const MAX_SPEED = 100000;
+  const C = 2 * Math.PI * 97;
+  const S = { phase: 'setup', duration: 0, remAnchor: 0, tAnchor: 0, speed: 1, rampMs: 2000, rampActive: false };
+  let settingsReady = false; // saving starts once everything below has loaded
+
+  const clampSpeed = v => Number.isFinite(v) && v > 0 ? Math.min(Math.max(v, 1), MAX_SPEED) : 1;
+  // Ramp: speed eases from 1× to S.speed over rampMs using smoothstep; rampE is its integral (0..1 → 0..½).
+  const rampE = u => u * u * u - u * u * u * u / 2;
+  // simulated ms elapsed for t real ms since the anchor
+  function simAt(t, V, R) {
+    if (!R || V <= 1) return t * V;
+    if (t < R) return t + (V - 1) * R * rampE(t / R);
+    return R + (V - 1) * R / 2 + V * (t - R);
+  }
+  const simElapsed = t => simAt(t, S.speed, S.rampActive ? S.rampMs : 0);
+  // real ms needed to pass D sim-ms at speed V with ramp R (bisection; simAt is increasing in t)
+  function timeToPass(D, V, R) {
+    let lo = 0, hi = D / V + R + 1;
+    for (let i = 0; i < 60; i++) { const m = (lo + hi) / 2; simAt(m, V, R) < D ? lo = m : hi = m; }
+    return hi;
+  }
+  // speed that passes D sim-ms in T real-ms with ramp R (sim is linear in V: a + V·b)
+  function solveSpeed(D, T, R) {
+    if (!R) return D / T;
+    if (T <= R) { const b = R * rampE(T / R); return (D - (T - b)) / b; }
+    return (D - R / 2) / (T - R / 2);
+  }
+  const remaining = now => S.phase === 'running'
+    ? Math.max(0, S.remAnchor - simElapsed(Math.max(0, now - S.tAnchor)))
+    : S.remAnchor;
+  // browsers round performance.now() to ~0.1–1 ms; at 7,200× that step is 7.2 s, which would lock the
+  // .cc digits to a few repeating values. A sub-ms dither restores natural digits and is always < 1/16 of a frame.
+  const clock = () => performance.now() + Math.random();
+  // freeze the current value as the new anchor, so changes never make the display jump
+  const rebase = now => { S.remAnchor = remaining(now); S.tAnchor = now; };
+  // mid-run changes apply instantly (any ramp in progress ends at the current value)
+  function setSpeed(v) {
+    if (S.phase === 'running') { rebase(performance.now()); S.rampActive = false; }
+    S.speed = clampSpeed(v);
+  }
+  function setRamp(ms) {
+    if (S.phase === 'running') { rebase(performance.now()); S.rampActive = false; }
+    S.rampMs = Number.isFinite(ms) && ms > 0 ? Math.min(ms, 60000) : 0;
+  }
+
+  /* ---------- display ---------- */
+  const pad = n => n < 10 ? '0' + n : '' + n;
+  function fmt(ms) {
+    const cs = Math.floor(ms / 10);
+    return pad(Math.floor(cs / 360000)) + ':' + pad(Math.floor(cs / 6000) % 60) + ':' +
+           pad(Math.floor(cs / 100) % 60) + '.' + pad(cs % 100);
+  }
+  prog.style.strokeDasharray = C + ' ' + C;
+  let lastTxt = '';
+  function render(rem) {
+    const t = fmt(rem);
+    if (t !== lastTxt) { timeEl.textContent = t; lastTxt = t; }
+    const f = S.duration ? rem / S.duration : 0;
+    prog.style.strokeDashoffset = (-(1 - f) * C).toFixed(3); // empties clockwise from 12 o'clock
+    prog.style.opacity = f > 0 ? 1 : 0;
+  }
+
+  /* ---------- wheel picker ---------- */
+  function makeWheel(el, max) {
+    const frag = document.createDocumentFragment();
+    for (let i = 0; i <= max; i++) { const d = document.createElement('div'); d.textContent = i; frag.appendChild(d); }
+    el.appendChild(frag);
+    const items = el.children;
+    let val = 0, raf = 0;
+    const rowH = () => items[0].getBoundingClientRect().height;
+    const mark = i => { items[val].classList.remove('sel'); val = i; items[i].classList.add('sel'); };
+    el.addEventListener('scroll', () => {
+      if (raf) return;
+      raf = requestAnimationFrame(() => {
+        raf = 0;
+        const i = Math.max(0, Math.min(max, Math.round(el.scrollTop / rowH())));
+        if (i !== val) { mark(i); updateButtons(); }
+      });
+    }, { passive: true });
+    el.addEventListener('click', e => {
+      const i = Array.prototype.indexOf.call(items, e.target);
+      if (i >= 0) el.scrollTo({ top: i * rowH(), behavior: 'smooth' });
+    });
+    return {
+      get value() { return val; },
+      set(i) { mark(i); el.scrollTop = i * rowH(); }
+    };
+  }
+  const wh = makeWheel($('wh'), 99), wm = makeWheel($('wm'), 59), ws = makeWheel($('ws'), 59);
+  const pickerTotal = () => ((wh.value * 60 + wm.value) * 60 + ws.value) * 1000;
+  wh.set(1); wm.set(0); ws.set(0);
+  addEventListener('resize', () => [wh, wm, ws].forEach(w => w.set(w.value)));
+
+  /* ---------- state machine ---------- */
+  const LABELS = { setup: ['Start', 'go'], running: ['Pause', 'pause'], paused: ['Resume', 'go'], done: ['Restart', 'go'] };
+  function updateButtons() {
+    const [label, kind] = LABELS[S.phase];
+    btnMain.textContent = label;
+    btnMain.className = 'btn ' + kind;
+    btnMain.disabled = S.phase === 'setup' && pickerTotal() === 0;
+    btnCancel.disabled = S.phase === 'setup';
+    saveSettings();
+  }
+  function setPhase(p) { S.phase = p; document.body.dataset.phase = p; updateButtons(); wake(p !== 'setup'); }
+
+  /* ---------- keep the screen awake while a timer is on screen ---------- */
+  let lock = null;
+  async function wake(on) {
+    try {
+      if (on && !lock && navigator.wakeLock && document.visibilityState === 'visible') {
+        lock = await navigator.wakeLock.request('screen');
+        lock.addEventListener('release', () => { lock = null; });
+      } else if (!on && lock) { const l = lock; lock = null; await l.release(); }
+    } catch (e) { lock = null; }
+  }
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible') wake(S.phase !== 'setup'); else saveSettings();
+  });
+
+  let raf = 0;
+  function loop() {
+    const r = remaining(clock());
+    render(r);
+    if (r <= 0) { finish(); return; }
+    raf = requestAnimationFrame(loop);
+  }
+  function run(fromMs) { S.remAnchor = fromMs; S.tAnchor = performance.now(); S.tStart = S.tAnchor; S.rampActive = S.rampMs > 0; setPhase('running'); loop(); }
+  function start()   { const d = pickerTotal(); if (!d) return; S.duration = d; run(d); }
+  function pause()   { rebase(clock()); cancelAnimationFrame(raf); setPhase('paused'); render(S.remAnchor); }
+  function resume()  { run(S.remAnchor); }
+  function restart() { run(S.duration); }
+  function finish()  { cancelAnimationFrame(raf); S.remAnchor = 0; S.tDone = performance.now(); setPhase('done'); render(0); }
+  function cancel()  { cancelAnimationFrame(raf); setPhase('setup'); }
+
+  const ACTIONS = { setup: start, running: pause, paused: resume, done: restart };
+  btnMain.addEventListener('click', () => { btnMain.blur(); ACTIONS[S.phase](); });
+  btnCancel.addEventListener('click', () => { btnCancel.blur(); cancel(); });
+  addEventListener('keydown', e => {
+    if (e.code === 'Escape' && back.classList.contains('open')) { closePanel(); return; }
+    if (e.target.tagName === 'INPUT' || back.classList.contains('open')) return;
+    if (e.code === 'Space') { e.preventDefault(); if (!btnMain.disabled) ACTIONS[S.phase](); }
+    else if (e.code === 'Escape' && S.phase !== 'setup') cancel();
+  });
+
+  updateButtons();
+  /* ---------- hidden speed panel ---------- */
+  const back = $('back'), speedIn = $('speedIn'), slider = $('speedSlider'), chipsEl = $('chips');
+  const autoH = $('autoH'), autoM = $('autoM'), autoS = $('autoS'), autoNote = $('autoNote');
+  const rampS = $('rampS'), rampOn = $('rampOn');
+  const nf = new Intl.NumberFormat('en-US', { maximumFractionDigits: 2 });
+  const PRESETS = [1, 10, 100, 1000, 7200, 10000, 100000];
+  const toSlider = v => Math.round(Math.log10(v) / 5 * 1000);
+  const fromSlider = x => { const v = 10 ** (x * 5 / 1000); return v >= 100 ? Math.round(v) : Math.round(v * 10) / 10; };
+  const num = el => parseFloat(String(el.value).replace(/,/g, ''));
+
+  PRESETS.forEach(v => {
+    const b = document.createElement('button');
+    b.className = 'chip'; b.dataset.v = v; b.textContent = nf.format(v) + '×';
+    b.addEventListener('click', () => { setSpeed(v); syncSpeed(); });
+    chipsEl.appendChild(b);
+  });
+  function syncSpeed(skipInput) {
+    if (!skipInput) speedIn.value = nf.format(S.speed);
+    slider.value = toSlider(S.speed);
+    chipsEl.querySelectorAll('.chip').forEach(c => c.classList.toggle('on', +c.dataset.v === S.speed));
+  }
+  speedIn.addEventListener('input', () => { const v = num(speedIn); if (v > 0) { setSpeed(v); syncSpeed(true); } });
+  speedIn.addEventListener('change', () => syncSpeed());
+  speedIn.addEventListener('keydown', e => { if (e.key === 'Enter') speedIn.blur(); });
+  slider.addEventListener('input', () => { setSpeed(fromSlider(+slider.value)); syncSpeed(); });
+
+  $('autoGo').addEventListener('click', () => {
+    const D = ((num(autoH) || 0) * 60 + (num(autoM) || 0)) * 60000, T = (num(autoS) || 0) * 1000;
+    if (!(D > 0 && T > 0)) { autoNote.textContent = 'Enter a time to pass and the seconds to take.'; return; }
+    const R = S.rampMs, need = solveSpeed(D, T, R);
+    setSpeed(need); syncSpeed();
+    if (need > MAX_SPEED) {
+      const takes = timeToPass(D, MAX_SPEED, R);
+      autoNote.textContent = `Needs ${nf.format(Math.round(need))}× — capped at 100,000× (takes ≈ ${nf.format(takes / 1000)} s).`;
+    } else if (need < 1) {
+      autoNote.textContent = 'That is slower than real time — set to 1×.';
+    } else {
+      autoNote.textContent = `Set to ${nf.format(S.speed)}×` + (R ? ` (includes the ${nf.format(R / 1000)} s ramp).` : '.');
+    }
+  });
+
+  function syncRamp() { rampOn.checked = S.rampMs > 0; rampS.value = nf.format((S.rampMs || lastRamp) / 1000); }
+  let lastRamp = S.rampMs;
+  rampOn.addEventListener('change', () => { setRamp(rampOn.checked ? lastRamp : 0); syncRamp(); });
+  rampS.addEventListener('change', () => {
+    const ms = num(rampS) * 1000;
+    if (ms > 0) { lastRamp = Math.min(ms, 60000); if (rampOn.checked) setRamp(lastRamp); }
+    syncRamp();
+  });
+
+  function openPanel() {
+    const base = S.phase === 'setup' ? pickerTotal() : S.phase === 'done' ? S.duration : remaining(performance.now());
+    autoH.value = Math.floor(base / 3600000); autoM.value = Math.floor(base % 3600000 / 60000);
+    if (!autoS.value) autoS.value = 4;
+    autoNote.textContent = '';
+    syncSpeed(); syncRamp();
+    back.classList.add('open');
+  }
+  function closePanel() { document.activeElement && document.activeElement.blur(); back.classList.remove('open'); saveSettings(); }
+  $('done').addEventListener('click', closePanel);
+  back.addEventListener('click', e => { if (e.target === back) closePanel(); });
+
+  let taps = [];
+  $('corner').addEventListener('pointerdown', e => {
+    taps = taps.filter(t => e.timeStamp - t < 700); taps.push(e.timeStamp);
+    if (taps.length >= 3) { taps = []; openPanel(); }
+  });
+  document.querySelector('.nav').addEventListener('click', e => e.target.closest('button') && e.target.closest('button').blur());
+
+  /* ---------- fullscreen ---------- */
+  const fsBtn = $('fs'), root = document.documentElement;
+  const fsEl = () => document.fullscreenElement || document.webkitFullscreenElement;
+  const fsOK = !!(document.fullscreenEnabled || document.webkitFullscreenEnabled);
+  // installed app: iOS opens standalone, Android can open truly fullscreen — either way the button isn't needed
+  const standalone = ['standalone', 'fullscreen'].some(m => matchMedia(`(display-mode: ${m})`).matches) || navigator.standalone === true;
+  const syncFs = () => { fsBtn.hidden = !fsOK || standalone || !!fsEl(); };
+  async function enterFs() {
+    try { await (root.requestFullscreen ? root.requestFullscreen({ navigationUI: 'hide' }) : root.webkitRequestFullscreen()); }
+    catch (e) { fsBtn.hidden = true; }
+  }
+  fsBtn.addEventListener('click', enterFs);
+  ['fullscreenchange', 'webkitfullscreenchange'].forEach(ev => document.addEventListener(ev, syncFs));
+  addEventListener('keydown', e => {
+    if (e.code !== 'KeyF' || e.target.tagName === 'INPUT' || back.classList.contains('open')) return;
+    if (fsEl()) (document.exitFullscreen || document.webkitExitFullscreen).call(document); else if (fsOK) enterFs();
+  });
+  syncFs();
+
+  /* ---------- remembered settings (this browser only; safe if storage is blocked) ---------- */
+  const KEY = 'speedTimer.v1';
+  function saveSettings() {
+    if (!settingsReady) return;
+    try {
+      localStorage.setItem(KEY, JSON.stringify({ speed: S.speed, rampMs: S.rampMs, lastRamp, autoS: autoS.value,
+        h: wh.value, m: wm.value, s: ws.value }));
+    } catch (e) {}
+  }
+  try {
+    const v = JSON.parse(localStorage.getItem(KEY)) || {};
+    if (v.speed) S.speed = clampSpeed(v.speed);
+    if (typeof v.rampMs === 'number') S.rampMs = v.rampMs;
+    if (v.lastRamp > 0) lastRamp = v.lastRamp;
+    if (v.autoS) autoS.value = v.autoS;
+    if ([v.h, v.m, v.s].every(Number.isInteger)) { wh.set(v.h); wm.set(v.m); ws.set(v.s); }
+  } catch (e) {}
+  addEventListener('pagehide', saveSettings);
+  document.body.dataset.phase = S.phase;
+  updateButtons();
+  settingsReady = true;
+
+  /*PWA*/ // offline support when installed from a web host (not needed inside a Claude artifact)
+  if ('serviceWorker' in navigator && isSecureContext && location.protocol !== 'file:') navigator.serviceWorker.register('sw.js').catch(() => {});
+  /*/PWA*/
+
+  window.__timer = { S, setSpeed, setRamp, remaining, simElapsed, solveSpeed, fmt, openPanel, wheels: { wh, wm, ws } }; // test hook
+})();
+</script>
+</body>
+</html>
